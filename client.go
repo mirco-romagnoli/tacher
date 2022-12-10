@@ -52,7 +52,8 @@ func Generate(data *AppData) error {
 			if err != nil {
 				return fmt.Errorf("unexpected response code [%d]. Can't read error message [%w]", resp.StatusCode, err)
 			}
-			errorMessage, err := getErrorMessageFromResponse(body)
+			parsed, err := oj.Parse(body)
+			errorMessage, err := extract[string](parsed, "$.message", func(i []interface{}) interface{} { return i[0] })
 			if err != nil {
 				return fmt.Errorf("unexpected response code [%d]. Can't parse error message [%w]", resp.StatusCode, err)
 			}
@@ -268,17 +269,4 @@ func extract[T interface{}](obj interface{}, jsonPath string, mergeFunction func
 	var ret T
 	oj.Unmarshal([]byte(json), &ret)
 	return ret, nil
-}
-
-// extract the error message from Spring intializer's response
-func getErrorMessageFromResponse(response []byte) (string, error) {
-	parsed, err := oj.Parse(response)
-	if err != nil {
-		return "", err
-	}
-	path, err := jp.ParseString("$.message")
-	if err != nil {
-		return "", err
-	}
-	return path.Get(parsed)[0].(string), nil
 }
