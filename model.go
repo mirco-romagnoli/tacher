@@ -36,14 +36,25 @@ func (v ValueWithDescByName) Less(i, j int) bool {
 
 // application state, including spring initializer's options
 type AppState struct {
-	App              *tview.Application
-	Pages            *tview.Pages
-	Dependency       map[string][]ValueWithDesc
-	SpringBuildTools []ValueWithDesc
-	Packaging        []Value
-	Languages        []Value
-	SpringVersions   []Value
-	JavaVersions     []Value
+	App                    *tview.Application
+	Pages                  *tview.Pages
+	DefaultGroupId         string
+	DefaultArtifactId      string
+	DefaultVersion         string
+	DefaultName            string
+	DefaultDescription     string
+	DefaultPackageName     string
+	Dependency             map[string][]ValueWithDesc
+	SpringBuildTools       []ValueWithDesc
+	DefaultSpringBuildTool int
+	Packaging              []Value
+	DefaultPackaging       int
+	Languages              []Value
+	DefaultLanguage        int
+	SpringVersions         []Value
+	DefaultSpringVersion   int
+	JavaVersions           []Value
+	DefaultJavaVersion     int
 }
 
 // application data, contains the values used to generate the project package

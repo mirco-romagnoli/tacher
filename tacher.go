@@ -17,20 +17,20 @@ const PAGE_PRJ_PATH = "Project Path"
 const INITIAL_PAGE = PAGE_INTRO
 
 func RunUI(group, artifact, name, description, pkg string) error {
-	// init data from parameters
-	data := new(AppData)
-	data.Group = nonNullOrElse(group, "org.example")
-	data.Artifact = nonNullOrElse(artifact, "demo")
-	data.Name = nonNullOrElse(artifact, "demo")
-	data.Description = nonNullOrElse(description, "Demo project for Spring Boot")
-	data.Pkg = nonNullOrElse(pkg, "com.example.demo")
-
 	// init app's state and retrieve options from Spring initializer
 	state := new(AppState)
 	err := GetOptions(state)
 	if err != nil {
 		return err
 	}
+
+	// init data from parameters
+	data := new(AppData)
+	data.Group = nonNullOrElse(group, state.DefaultGroupId)
+	data.Artifact = nonNullOrElse(artifact, state.DefaultArtifactId)
+	data.Name = nonNullOrElse(artifact, state.DefaultName)
+	data.Description = nonNullOrElse(description, state.DefaultDescription)
+	data.Pkg = nonNullOrElse(pkg, state.DefaultPackageName)
 
 	// init app gui
 	state.App = tview.NewApplication()
@@ -56,9 +56,9 @@ func buildIntroForm(state *AppState, data *AppData) *tview.Form {
 
 	// build intro form
 	form := tview.NewForm().
-		AddDropDown("Project", buildTools, 0, func(option string, optionIndex int) { data.SpringBuildTool = state.SpringBuildTools[optionIndex].ID }).
-		AddDropDown("Language", languages, 0, func(option string, optionIndex int) { data.Language = state.Languages[optionIndex].ID }).
-		AddDropDown("Spring Boot", springBootVersions, 0, func(option string, optionIndex int) { data.SpringBootVersion = state.SpringVersions[optionIndex].ID }).
+		AddDropDown("Project", buildTools, state.DefaultSpringBuildTool, func(option string, optionIndex int) { data.SpringBuildTool = state.SpringBuildTools[optionIndex].ID }).
+		AddDropDown("Language", languages, state.DefaultLanguage, func(option string, optionIndex int) { data.Language = state.Languages[optionIndex].ID }).
+		AddDropDown("Spring Boot", springBootVersions, state.DefaultSpringVersion, func(option string, optionIndex int) { data.SpringBootVersion = state.SpringVersions[optionIndex].ID }).
 		AddButton("Next", func() { state.Pages.SwitchToPage(PAGE_PRJ_META) }).
 		AddButton("Quit", func() { state.App.Stop() })
 	form.SetBorder(true).SetTitle("Project").SetTitleAlign(tview.AlignLeft)
@@ -77,8 +77,8 @@ func buildProjectMetadataForm(state *AppState, data *AppData) *tview.Form {
 		AddInputField("Name", data.Name, 200, nil, func(text string) { data.Name = text }).
 		AddInputField("Description", data.Description, 200, nil, func(text string) { data.Description = text }).
 		AddInputField("Package name", data.Pkg, 200, nil, func(text string) { data.Pkg = text }).
-		AddDropDown("Packaging", packagings, 0, func(option string, optionIndex int) { data.Packaging = state.Packaging[optionIndex].ID }).
-		AddDropDown("Java", javaVersions, 0, func(option string, optionIndex int) { data.JavaVersion = state.JavaVersions[optionIndex].ID }).
+		AddDropDown("Packaging", packagings, state.DefaultPackaging, func(option string, optionIndex int) { data.Packaging = state.Packaging[optionIndex].ID }).
+		AddDropDown("Java", javaVersions, state.DefaultJavaVersion, func(option string, optionIndex int) { data.JavaVersion = state.JavaVersions[optionIndex].ID }).
 		AddButton("Next", func() { state.Pages.SwitchToPage(PAGE_DEPENDENCIES) }).
 		AddButton("Back", func() { state.Pages.SwitchToPage(PAGE_INTRO) }).
 		AddButton("Quit", func() { state.App.Stop() })

@@ -91,33 +91,93 @@ func GetOptions(state *AppState) error {
 		return err
 	}
 
+	// fill text defaults
+	textDefaults := map[string]*string{
+		"$.groupId.default":     &state.DefaultGroupId,
+		"$.artifactId.default":  &state.DefaultArtifactId,
+		"$.version.default":     &state.DefaultVersion,
+		"$.name.default":        &state.DefaultName,
+		"$.description.default": &state.DefaultDescription,
+		"$.packageName.default": &state.DefaultPackageName,
+	}
+	for k, v := range textDefaults {
+		if def, err := extract[string](obj, k, func(i []interface{}) interface{} { return i[0] }); err == nil {
+			*v = def
+		}
+	}
+
 	// fill Spring build tools
-	state.SpringBuildTools, err = extract[[]ValueWithDesc](obj, "$.type.values[*]")
+	state.SpringBuildTools, err = extract[[]ValueWithDesc](obj, "$.type.values[*]", nil)
 	if err != nil {
+		return err
+	}
+	if def, err := extract[string](obj, "$.type.default", func(i []interface{}) interface{} { return i[0] }); err == nil {
+		if idx, found := Find(state.SpringBuildTools, func(st ValueWithDesc) bool { return st.ID == def }); found {
+			state.DefaultSpringBuildTool = idx
+		} else {
+			state.DefaultSpringBuildTool = 0
+		}
+	} else {
 		return err
 	}
 
 	// fill packaging
-	state.Packaging, err = extract[[]Value](obj, "$.packaging.values[*]")
+	state.Packaging, err = extract[[]Value](obj, "$.packaging.values[*]", nil)
 	if err != nil {
+		return err
+	}
+	if def, err := extract[string](obj, "$.packaging.default", func(i []interface{}) interface{} { return i[0] }); err == nil {
+		if idx, found := Find(state.Packaging, func(p Value) bool { return p.ID == def }); found {
+			state.DefaultPackaging = idx
+		} else {
+			state.DefaultPackaging = 0
+		}
+	} else {
 		return err
 	}
 
 	// fill Java versions
-	state.JavaVersions, err = extract[[]Value](obj, "$.javaVersion.values[*]")
+	state.JavaVersions, err = extract[[]Value](obj, "$.javaVersion.values[*]", nil)
 	if err != nil {
+		return err
+	}
+	if def, err := extract[string](obj, "$.javaVersion.default", func(i []interface{}) interface{} { return i[0] }); err == nil {
+		if idx, found := Find(state.JavaVersions, func(v Value) bool { return v.ID == def }); found {
+			state.DefaultJavaVersion = idx
+		} else {
+			state.DefaultJavaVersion = 0
+		}
+	} else {
 		return err
 	}
 
 	// fill languages
-	state.Languages, err = extract[[]Value](obj, "$.language.values[*]")
+	state.Languages, err = extract[[]Value](obj, "$.language.values[*]", nil)
 	if err != nil {
+		return err
+	}
+	if def, err := extract[string](obj, "$.language.default", func(i []interface{}) interface{} { return i[0] }); err == nil {
+		if idx, found := Find(state.Languages, func(l Value) bool { return l.ID == def }); found {
+			state.DefaultLanguage = idx
+		} else {
+			state.DefaultLanguage = 0
+		}
+	} else {
 		return err
 	}
 
 	// fill Spring Boot versions
-	state.SpringVersions, err = extract[[]Value](obj, "$.bootVersion.values[*]")
+	state.SpringVersions, err = extract[[]Value](obj, "$.bootVersion.values[*]", nil)
 	if err != nil {
+		return err
+	}
+	if def, err := extract[string](obj, "$.bootVersion.default", func(i []interface{}) interface{} { return i[0] }); err == nil {
+		if idx, found := Find(state.SpringVersions, func(v Value) bool { return v.ID == def }); found {
+			state.DefaultSpringVersion = idx
+		} else {
+			state.DefaultSpringVersion = 0
+		}
+	} else {
 		return err
 	}
 
@@ -181,7 +241,7 @@ func extractDependencies(obj interface{}) (map[string][]ValueWithDesc, error) {
 	ret := make(map[string][]ValueWithDesc)
 	for _, value := range values {
 		name := value.(map[string]interface{})["name"].(string)
-		ret[name], err = extract[[]ValueWithDesc](value, "$.values[*]")
+		ret[name], err = extract[[]ValueWithDesc](value, "$.values[*]", nil)
 		sort.Sort(ValueWithDescByName(ret[name]))
 		if err != nil {
 			return nil, err
@@ -192,13 +252,19 @@ func extractDependencies(obj interface{}) (map[string][]ValueWithDesc, error) {
 }
 
 // map the result of the json path on the input interface and maps it on the given type
-func extract[T interface{}](obj interface{}, jsonPath string) (T, error) {
+func extract[T interface{}](obj interface{}, jsonPath string, mergeFunction func([]interface{}) interface{}) (T, error) {
+	if mergeFunction == nil {
+		// if no merge function was passed then return the identity function
+		mergeFunction = func(i []interface{}) interface{} { return i }
+	}
+
 	path, err := jp.ParseString(jsonPath)
 	if err != nil {
 		var zero T
 		return zero, err
 	}
-	json := oj.JSON(path.Get(obj))
+	results := mergeFunction(path.Get(obj))
+	json := oj.JSON(results)
 	var ret T
 	oj.Unmarshal([]byte(json), &ret)
 	return ret, nil

@@ -22,6 +22,15 @@ func Map[T any, R any](list []T, mapFunction func(T) R) (ret []R) {
 	return
 }
 
+func Find[T any](list []T, compareFunction func(elem T) bool) (int, bool) {
+	for i, elem := range list {
+		if compareFunction(elem) {
+			return i, true
+		}
+	}
+	return -1, false
+}
+
 // remove the i-th from the slice, the following elements are moved left
 func RemoveIndex[T interface{}](s []T, index int) []T {
 	return append(s[:index], s[index+1:]...)
