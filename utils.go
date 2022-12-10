@@ -22,6 +22,8 @@ func Map[T any, R any](list []T, mapFunction func(T) R) (ret []R) {
 	return
 }
 
+// returns the index of the first element in the input list that matches
+// the compare function
 func Find[T any](list []T, compareFunction func(elem T) bool) (int, bool) {
 	for i, elem := range list {
 		if compareFunction(elem) {
