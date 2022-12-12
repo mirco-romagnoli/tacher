@@ -11,7 +11,7 @@ The only prerequisite is Go `>=1.19`
 You can build Tacher by running  
 
 ```bash
-go build .
+go build ./src
 ```
 
 Then you will find the `tacher` executable in the directory you're in.
