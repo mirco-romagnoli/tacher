@@ -1,10 +1,13 @@
-package main
+package ui
 
 import (
 	"fmt"
 	"os"
 	"path"
 	"sort"
+	"tacher/src/client"
+	"tacher/src/model"
+	"tacher/src/utils"
 
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
@@ -18,19 +21,19 @@ const INITIAL_PAGE = PAGE_INTRO
 
 func RunUI(group, artifact, name, description, pkg string) error {
 	// init app's state and retrieve options from Spring initializer
-	state := new(AppState)
-	err := GetOptions(state)
+	state := new(model.AppState)
+	err := client.GetOptions(state)
 	if err != nil {
 		return err
 	}
 
 	// init data from parameters
-	data := new(AppData)
-	data.Group = nonNullOrElse(group, state.DefaultGroupId)
-	data.Artifact = nonNullOrElse(artifact, state.DefaultArtifactId)
-	data.Name = nonNullOrElse(artifact, state.DefaultName)
-	data.Description = nonNullOrElse(description, state.DefaultDescription)
-	data.Pkg = nonNullOrElse(pkg, state.DefaultPackageName)
+	data := new(model.AppData)
+	data.Group = utils.NonNullOrElse(group, state.DefaultGroupId)
+	data.Artifact = utils.NonNullOrElse(artifact, state.DefaultArtifactId)
+	data.Name = utils.NonNullOrElse(artifact, state.DefaultName)
+	data.Description = utils.NonNullOrElse(description, state.DefaultDescription)
+	data.Pkg = utils.NonNullOrElse(pkg, state.DefaultPackageName)
 
 	// init app gui
 	state.App = tview.NewApplication()
@@ -48,11 +51,11 @@ func RunUI(group, artifact, name, description, pkg string) error {
 	return nil
 }
 
-func buildIntroForm(state *AppState, data *AppData) *tview.Form {
+func buildIntroForm(state *model.AppState, data *model.AppData) *tview.Form {
 	// map values into dropdown options
-	buildTools := Map(state.SpringBuildTools, func(st ValueWithDesc) string { return st.Name })
-	languages := Map(state.Languages, func(l Value) string { return l.Name })
-	springBootVersions := Map(state.SpringVersions, func(v Value) string { return v.Name })
+	buildTools := utils.Map(state.SpringBuildTools, func(st model.ValueWithDesc) string { return st.Name })
+	languages := utils.Map(state.Languages, func(l model.Value) string { return l.Name })
+	springBootVersions := utils.Map(state.SpringVersions, func(v model.Value) string { return v.Name })
 
 	// build intro form
 	form := tview.NewForm().
@@ -65,10 +68,10 @@ func buildIntroForm(state *AppState, data *AppData) *tview.Form {
 	return form
 }
 
-func buildProjectMetadataForm(state *AppState, data *AppData) *tview.Form {
+func buildProjectMetadataForm(state *model.AppState, data *model.AppData) *tview.Form {
 	// map values into dropdown options
-	packagings := Map(state.Packaging, func(p Value) string { return p.Name })
-	javaVersions := Map(state.JavaVersions, func(v Value) string { return v.Name })
+	packagings := utils.Map(state.Packaging, func(p model.Value) string { return p.Name })
+	javaVersions := utils.Map(state.JavaVersions, func(v model.Value) string { return v.Name })
 
 	// build project metadata form
 	form := tview.NewForm().
@@ -86,7 +89,7 @@ func buildProjectMetadataForm(state *AppState, data *AppData) *tview.Form {
 	return form
 }
 
-func buildDependenciesPage(state *AppState, data *AppData) *tview.Grid {
+func buildDependenciesPage(state *model.AppState, data *model.AppData) *tview.Grid {
 	grid := tview.NewGrid().
 		SetRows(-1, -1, -1, 1).SetColumns(0, 0, 0)
 
@@ -125,7 +128,7 @@ func buildDependenciesPage(state *AppState, data *AppData) *tview.Grid {
 
 	// populate description's text area with selected node description
 	tree.SetChangedFunc(func(node *tview.TreeNode) {
-		ref, isValueWithDesc := node.GetReference().(ValueWithDesc)
+		ref, isValueWithDesc := node.GetReference().(model.ValueWithDesc)
 		if isValueWithDesc {
 			description.SetText(ref.Description)
 		} else {
@@ -135,12 +138,12 @@ func buildDependenciesPage(state *AppState, data *AppData) *tview.Grid {
 
 	// add or remove dependency from selected list
 	tree.SetSelectedFunc(func(node *tview.TreeNode) {
-		ref, isValueWithDesc := node.GetReference().(ValueWithDesc)
+		ref, isValueWithDesc := node.GetReference().(model.ValueWithDesc)
 		if !isValueWithDesc {
 			return
 		}
 		if idx := sort.Search(len(data.Dependencies), func(i int) bool { return data.Dependencies[i].ID == ref.ID }); idx < len(data.Dependencies) {
-			data.Dependencies = RemoveIndex(data.Dependencies, idx)
+			data.Dependencies = utils.RemoveIndex(data.Dependencies, idx)
 			selected.RemoveItem(idx)
 			node.SetColor(tcell.ColorWhite)
 		} else {
@@ -176,7 +179,7 @@ func buildDependenciesPage(state *AppState, data *AppData) *tview.Grid {
 	return grid
 }
 
-func buildProjectPathPage(state *AppState, data *AppData) *tview.Form {
+func buildProjectPathPage(state *model.AppState, data *model.AppData) *tview.Form {
 	// get user's home dir
 	initialDir, err := os.UserHomeDir()
 	if err != nil {
@@ -189,7 +192,7 @@ func buildProjectPathPage(state *AppState, data *AppData) *tview.Form {
 	form := tview.NewForm().
 		AddInputField("Project path", initialDir, 200, nil, func(text string) { data.Path = text }).
 		AddButton("Next", func() {
-			if err := Generate(data); err != nil {
+			if err := client.Generate(data); err != nil {
 				// handle project generation error
 				showError(state, err, nil)
 			} else {
@@ -204,17 +207,17 @@ func buildProjectPathPage(state *AppState, data *AppData) *tview.Form {
 }
 
 // helper that shows an info modal
-func showInfo(state *AppState, message string, handler func(buttonIndex int, buttonLabel string)) {
+func showInfo(state *model.AppState, message string, handler func(buttonIndex int, buttonLabel string)) {
 	showModal(state, message, tcell.ColorBlue, []string{"Ok"}, handler)
 }
 
 // helper that shows an error modal
-func showError(state *AppState, err error, handler func(buttonIndex int, buttonLabel string)) {
+func showError(state *model.AppState, err error, handler func(buttonIndex int, buttonLabel string)) {
 	showModal(state, err.Error(), tcell.ColorRed, []string{"Ok"}, handler)
 }
 
 // helper that shows a modal. The handler function is used to set the behaviour when one of the buttons is chosen
-func showModal(state *AppState, message string, modalColor tcell.Color, buttons []string, handler func(buttonIndex int, buttonLabel string)) {
+func showModal(state *model.AppState, message string, modalColor tcell.Color, buttons []string, handler func(buttonIndex int, buttonLabel string)) {
 	// set default handler if none was passed
 	if handler == nil {
 		handler = func(buttonIndex int, buttonLabel string) {

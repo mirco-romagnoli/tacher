@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"tacher/src/ui"
 
 	"github.com/urfave/cli/v2"
 )
@@ -17,7 +18,7 @@ func main() {
 				Name:  "init",
 				Usage: "init a Spring Boot project",
 				Action: func(ctx *cli.Context) error {
-					err := RunUI(
+					err := ui.RunUI(
 						ctx.String("group"),
 						ctx.String("artifact"),
 						ctx.String("name"),

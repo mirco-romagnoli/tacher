@@ -1,4 +1,4 @@
-package main
+package client
 
 import (
 	"archive/zip"
@@ -11,6 +11,8 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"tacher/src/model"
+	"tacher/src/utils"
 
 	"github.com/ohler55/ojg/jp"
 	"github.com/ohler55/ojg/oj"
@@ -19,7 +21,7 @@ import (
 const SPRING_URL = "https://start.spring.io/"
 
 // generates the project package from the given data
-func Generate(data *AppData) error {
+func Generate(data *model.AppData) error {
 	req, err := http.NewRequest("GET", SPRING_URL+"starter.zip", nil)
 	if err != nil {
 		return err
@@ -37,13 +39,13 @@ func Generate(data *AppData) error {
 	q.Add("packageName", data.Pkg)
 	q.Add("packaging", data.Packaging)
 	q.Add("javaVersion", data.JavaVersion)
-	q.Add("dependencies", strings.Join(Map(data.Dependencies, func(v ValueWithDesc) string { return v.ID }), ","))
+	q.Add("dependencies", strings.Join(utils.Map(data.Dependencies, func(v model.ValueWithDesc) string { return v.ID }), ","))
 	req.URL.RawQuery = q.Encode()
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return err
 	}
-	defer CheckClose(resp.Body)
+	defer utils.CheckClose(resp.Body)
 
 	if resp.StatusCode != 200 {
 		// if the response contains a body then try to parse it to return a better feedback
@@ -52,8 +54,7 @@ func Generate(data *AppData) error {
 			if err != nil {
 				return fmt.Errorf("unexpected response code [%d]. Can't read error message [%w]", resp.StatusCode, err)
 			}
-			parsed, err := oj.Parse(body)
-			errorMessage, err := extract[string](parsed, "$.message", func(i []interface{}) interface{} { return i[0] })
+			errorMessage, err := getErrorMessageFromResponse(body)
 			if err != nil {
 				return fmt.Errorf("unexpected response code [%d]. Can't parse error message [%w]", resp.StatusCode, err)
 			}
@@ -77,7 +78,7 @@ func Generate(data *AppData) error {
 }
 
 // gets the options from Spring initializer and puts them in the app's state
-func GetOptions(state *AppState) error {
+func GetOptions(state *model.AppState) error {
 	// get data from Spring's website
 	resp, err := http.Get(SPRING_URL + "metadata/client")
 	if err != nil {
@@ -108,12 +109,12 @@ func GetOptions(state *AppState) error {
 	}
 
 	// fill Spring build tools
-	state.SpringBuildTools, err = extract[[]ValueWithDesc](obj, "$.type.values[*]", nil)
+	state.SpringBuildTools, err = extract[[]model.ValueWithDesc](obj, "$.type.values[*]", nil)
 	if err != nil {
 		return err
 	}
 	if def, err := extract[string](obj, "$.type.default", func(i []interface{}) interface{} { return i[0] }); err == nil {
-		if idx, found := Find(state.SpringBuildTools, func(st ValueWithDesc) bool { return st.ID == def }); found {
+		if idx, found := utils.Find(state.SpringBuildTools, func(st model.ValueWithDesc) bool { return st.ID == def }); found {
 			state.DefaultSpringBuildTool = idx
 		} else {
 			state.DefaultSpringBuildTool = 0
@@ -123,12 +124,12 @@ func GetOptions(state *AppState) error {
 	}
 
 	// fill packaging
-	state.Packaging, err = extract[[]Value](obj, "$.packaging.values[*]", nil)
+	state.Packaging, err = extract[[]model.Value](obj, "$.packaging.values[*]", nil)
 	if err != nil {
 		return err
 	}
 	if def, err := extract[string](obj, "$.packaging.default", func(i []interface{}) interface{} { return i[0] }); err == nil {
-		if idx, found := Find(state.Packaging, func(p Value) bool { return p.ID == def }); found {
+		if idx, found := utils.Find(state.Packaging, func(p model.Value) bool { return p.ID == def }); found {
 			state.DefaultPackaging = idx
 		} else {
 			state.DefaultPackaging = 0
@@ -138,12 +139,12 @@ func GetOptions(state *AppState) error {
 	}
 
 	// fill Java versions
-	state.JavaVersions, err = extract[[]Value](obj, "$.javaVersion.values[*]", nil)
+	state.JavaVersions, err = extract[[]model.Value](obj, "$.javaVersion.values[*]", nil)
 	if err != nil {
 		return err
 	}
 	if def, err := extract[string](obj, "$.javaVersion.default", func(i []interface{}) interface{} { return i[0] }); err == nil {
-		if idx, found := Find(state.JavaVersions, func(v Value) bool { return v.ID == def }); found {
+		if idx, found := utils.Find(state.JavaVersions, func(v model.Value) bool { return v.ID == def }); found {
 			state.DefaultJavaVersion = idx
 		} else {
 			state.DefaultJavaVersion = 0
@@ -153,12 +154,12 @@ func GetOptions(state *AppState) error {
 	}
 
 	// fill languages
-	state.Languages, err = extract[[]Value](obj, "$.language.values[*]", nil)
+	state.Languages, err = extract[[]model.Value](obj, "$.language.values[*]", nil)
 	if err != nil {
 		return err
 	}
 	if def, err := extract[string](obj, "$.language.default", func(i []interface{}) interface{} { return i[0] }); err == nil {
-		if idx, found := Find(state.Languages, func(l Value) bool { return l.ID == def }); found {
+		if idx, found := utils.Find(state.Languages, func(l model.Value) bool { return l.ID == def }); found {
 			state.DefaultLanguage = idx
 		} else {
 			state.DefaultLanguage = 0
@@ -168,12 +169,12 @@ func GetOptions(state *AppState) error {
 	}
 
 	// fill Spring Boot versions
-	state.SpringVersions, err = extract[[]Value](obj, "$.bootVersion.values[*]", nil)
+	state.SpringVersions, err = extract[[]model.Value](obj, "$.bootVersion.values[*]", nil)
 	if err != nil {
 		return err
 	}
 	if def, err := extract[string](obj, "$.bootVersion.default", func(i []interface{}) interface{} { return i[0] }); err == nil {
-		if idx, found := Find(state.SpringVersions, func(v Value) bool { return v.ID == def }); found {
+		if idx, found := utils.Find(state.SpringVersions, func(v model.Value) bool { return v.ID == def }); found {
 			state.DefaultSpringVersion = idx
 		} else {
 			state.DefaultSpringVersion = 0
@@ -233,17 +234,17 @@ func unzip(archive []byte, dest string) error {
 
 // extract the dependencies from Spring intializer's response, returns a map where
 // each key is the category and the values are the dependencies in that category
-func extractDependencies(obj interface{}) (map[string][]ValueWithDesc, error) {
+func extractDependencies(obj interface{}) (map[string][]model.ValueWithDesc, error) {
 	path, err := jp.ParseString("$.dependencies.values[*]")
 	if err != nil {
 		return nil, err
 	}
 	values := path.Get(obj)
-	ret := make(map[string][]ValueWithDesc)
+	ret := make(map[string][]model.ValueWithDesc)
 	for _, value := range values {
 		name := value.(map[string]interface{})["name"].(string)
-		ret[name], err = extract[[]ValueWithDesc](value, "$.values[*]", nil)
-		sort.Sort(ValueWithDescByName(ret[name]))
+		ret[name], err = extract[[]model.ValueWithDesc](value, "$.values[*]", nil)
+		sort.Sort(model.ValueWithDescByName(ret[name]))
 		if err != nil {
 			return nil, err
 		}
@@ -269,4 +270,17 @@ func extract[T interface{}](obj interface{}, jsonPath string, mergeFunction func
 	var ret T
 	oj.Unmarshal([]byte(json), &ret)
 	return ret, nil
+}
+
+// extract the error message from Spring intializer's response
+func getErrorMessageFromResponse(response []byte) (string, error) {
+	parsed, err := oj.Parse(response)
+	if err != nil {
+		return "", err
+	}
+	path, err := jp.ParseString("$.message")
+	if err != nil {
+		return "", err
+	}
+	return path.Get(parsed)[0].(string), nil
 }
